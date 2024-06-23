@@ -1,0 +1,567 @@
+Nama : Felisia Aquerah
+NPM : 2209010033
+
+1. Masuk ke direktori proyek pada gitbash
+composer create-project --prefer-dist laravel/laravel
+cd laravel
+
+2: Konfigurasi Database
+a. Buka file .env di direktori proyek Anda dan konfigurasikan pengaturan database MySQL:  
+env
+  DB_CONNECTION=mysql
+# DB_HOST=127.0.0.1
+# DB_PORT=3306
+# DB_DATABASE=laravel
+# DB_USERNAME=hospital_feli
+# DB_PASSWORD=password
+
+b. Buat database MySQL jika belum ada. Jalankan perintah berikut di MySQL prompt:   
+CREATE DATABASE nama_database;
+
+3. Buat Model dan Migration
+a. Buat model dan migration untuk Room
+C:\Users\ASUS\Desktop\laravel>php artisan make:model Models/Room -m
+   INFO  Model [C:\Users\ASUS\Desktop\laravel\app\Models\Models\Room.php] created successfully.
+   INFO  Migration [C:\Users\ASUS\Desktop\laravel\database\migrations/2024_06_22_131951_create_rooms_table.php] created successfully.
+
+   Ini akan membuat file model Room.php dan file migration untuk tabel rooms.
+
+b. Edit file migration untuk rooms di database/migrations/xxxx_xx_xx_xxxxxx_create_rooms_table.php
+<?php
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('rooms', function (Blueprint $table) {
+            $table->id();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('rooms');
+    }
+};
+
+c. Buat model dan migration untuk Patient
+C:\Users\ASUS\Desktop\laravel>php artisan make:model Models/Patients -m
+
+   INFO  Model [C:\Users\ASUS\Desktop\laravel\app\Models\Models\Patients.php] created successfully.
+
+   INFO  Migration [C:\Users\ASUS\Desktop\laravel\database\migrations/2024_06_22_160205_create_patients_table.php] created successfully.
+
+d. Edit file migration untuk patients di database/migrations/xxxx_xx_xx_xxxxxx_create_patients_table.php
+<?php
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('patients', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->date('admission_date');
+            $table->date('discharge_date')->nullable();
+            $table->foreignId('room_id')->constrained('rooms')->onDelete('cascade');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('patients');
+    }
+};
+
+
+4. Jalankan Migration
+a. Jalankan perintah migration untuk membuat tabel di database
+C:\Users\ASUS\Desktop\laravel>php artisan migrate
+   INFO  Running migrations.
+  2024_06_22_131951_create_rooms_table ................................................................. 157.87ms DONE
+  2024_06_22_160205_create_patients_table ............................................................... 66.61ms DONE
+
+5. Buat Relasi pada Model
+a. Edit model Room.php di app/Models/Room.php
+<?php
+namespace App\Models\Models;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+class Room extends Model
+{
+    use HasFactory;
+    protected $fillable = [
+        'room_number',
+        'level',
+        'type',
+        'is_available',
+    ];
+}
+
+b. Edit model Patient.php di app/Models/Patient.php   
+<?php
+namespace App\Models\Models;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+class Patients extends Model
+{
+    use HasFactory;
+    protected $fillable = ['name', 'admission_date', 'discharge_date', 'room_id'];
+    public function room()
+    {
+        return $this->belongsTo(Room::class);
+    }
+}
+
+6. Testing dan Implementasi Logika
+a. Buat controller untuk mengelola ketersediaan kamar dan pasien. Jalankan perintah berikut:
+C:\Users\ASUS\Desktop\laravel>php artisan make:controller RoomController
+   INFO  Controller [C:\Users\ASUS\Desktop\laravel\app\Http\Controllers\RoomController.php] created successfully.
+
+C:\Users\ASUS\Desktop\laravel>php artisan make:controller PantientController
+   INFO  Controller [C:\Users\ASUS\Desktop\laravel\app\Http\Controllers\PantientController.php] created successfully.
+
+b. Implementasikan logika untuk menampilkan kamar yang tersedia, pasien masuk, dan pasien keluar di controller.
+room controllers   
+<?php
+namespace App\Http\Controllers;
+
+use App\Models\Models\Room as ModelsRoom;
+use Illuminate\Http\Request;
+
+class RoomController extends Controller
+{
+    public function index()
+    {
+        // Mengubah kondisi where untuk kolom 'status'
+        $rooms = ModelsRoom::where('status', 'available')->get();
+        return view('rooms.index', compact('rooms'));
+    }
+}
+    
+
+CRUD lengkap 
+namespace App\Http\Controllers;
+use App\Models\Room;
+use Illuminate\Http\Request;
+
+class RoomController extends Controller
+{
+    // Menampilkan daftar kamar
+    public function index()
+    {
+        $rooms = Room::all();
+        return view('rooms.index', compact('rooms'));
+    }
+
+    // Menampilkan form untuk menambahkan kamar
+    public function create()
+    {
+        return view('rooms.create');
+    }
+
+    // Menyimpan kamar baru
+    public function store(Request $request)
+    {
+        $request->validate([
+            'room_number' => 'required|unique:rooms',
+            'level' => 'required',
+            'type' => 'required',
+        ]);
+
+        Room::create($request->all());
+        return redirect()->route('rooms.index')->with('success', 'Kamar berhasil ditambahkan.');
+    }
+
+    // Menampilkan form untuk mengedit kamar
+    public function edit(Room $room)
+    {
+        return view('rooms.edit', compact('room'));
+    }
+
+    // Memperbarui data kamar
+    public function update(Request $request, Room $room)
+    {
+        $request->validate([
+            'room_number' => 'required|unique:rooms,room_number,' . $room->id,
+            'level' => 'required',
+            'type' => 'required',
+        ]);
+
+        $room->update($request->all());
+        return redirect()->route('rooms.index')->with('success', 'Kamar berhasil diperbarui.');
+    }
+
+    // Menghapus kamar
+    public function destroy(Room $room)
+    {
+        $room->delete();
+        return redirect()->route('rooms.index')->with('success', 'Kamar berhasil dihapus.');
+    }
+}
+
+<?php
+
+patients controllers
+
+namespace App\Http\Controllers;
+
+use App\Models\Models\Patients;
+use App\Models\Models\Room as ModelsRoom;
+use App\Models\Patient;
+use App\Models\Room;
+use Illuminate\Http\Request;
+
+class PatientController extends Controller
+{
+    public function admitForm()
+    {
+        $availableRooms = ModelsRoom::where('is_available', true)->get();
+        return view('patients.admit', compact('availableRooms'));
+    }
+
+    public function admit(Request $request)
+    {
+        // Validasi data yang masuk
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'admission_date' => 'required|date',
+            'room_id' => 'required|exists:rooms,id',
+        ]);
+
+        // Membuat pasien baru
+        $patient = new Patients($request->all());
+        $patient->save();
+
+        // Update status kamar
+        $room = ModelsRoom::find($request->room_id);
+        $room->is_available = false;
+        $room->save();
+
+        return redirect()->route('rooms.index')->with('success', 'Pasien berhasil masuk.');
+    }
+
+    public function discharge(Patients $patient)
+    {
+        // Update status kamar
+        $room = $patient->room;
+        $room->is_available = true;
+        $room->save();
+
+        // Update tanggal keluar pasien
+        $patient->discharge_date = now();
+        $patient->save();
+
+        return redirect()->route('rooms.index')->with('success', 'Pasien berhasil keluar.');
+    }
+}
+
+CRUD Lengkap
+namespace App\Http\Controllers;
+
+use App\Models\Patient;
+use App\Models\Room;
+use Illuminate\Http\Request;
+
+class PatientController extends Controller
+{
+    // Menampilkan daftar pasien
+    public function index()
+    {
+        $patients = Patient::all();
+        return view('patients.index', compact('patients'));
+    }
+
+    // Menampilkan form untuk menambahkan pasien
+    public function create()
+    {
+        $availableRooms = Room::where('is_available', true)->get();
+        return view('patients.create', compact('availableRooms'));
+    }
+
+    // Menyimpan pasien baru
+    public function store(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'admission_date' => 'required|date',
+            'room_id' => 'required|exists:rooms,id',
+        ]);
+
+        $patient = Patient::create($request->all());
+
+        // Update status kamar
+        $room = Room::find($request->room_id);
+        $room->is_available = false;
+        $room->save();
+
+        return redirect()->route('patients.index')->with('success', 'Pasien berhasil ditambahkan.');
+    }
+
+    // Menampilkan form untuk mengedit pasien
+    public function edit(Patient $patient)
+    {
+        $availableRooms = Room::where('is_available', true)->get();
+        return view('patients.edit', compact('patient', 'availableRooms'));
+    }
+
+    // Memperbarui data pasien
+    public function update(Request $request, Patient $patient)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'admission_date' => 'required|date',
+            'discharge_date' => 'nullable|date',
+            'room_id' => 'required|exists:rooms,id',
+        ]);
+
+        $patient->update($request->all());
+
+        // Update status kamar jika pasien dipindah
+        if ($patient->room_id != $request->room_id) {
+            $oldRoom = Room::find($patient->room_id);
+            $oldRoom->is_available = true;
+            $oldRoom->save();
+
+            $newRoom = Room::find($request->room_id);
+            $newRoom->is_available = false;
+            $newRoom->save();
+        }
+
+        return redirect()->route('patients.index')->with('success', 'Pasien berhasil diperbarui.');
+    }
+
+    // Menghapus pasien
+    public function destroy(Patient $patient)
+    {
+        $patient->delete();
+
+        // Update status kamar
+        $room = Room::find($patient->room_id);
+        $room->is_available = true;
+        $room->save();
+
+        return redirect()->route('patients.index')->with('success', 'Pasien berhasil dihapus.');
+    }
+}
+
+c. Buat view untuk menampilkan kamar yang tersedia dan formulir pasien masuk/keluar
+
+   - resources/views/rooms/index.blade.php
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Daftar Kamar</title>
+</head>
+<body>
+    <h1>Daftar Kamar Tersedia</h1>
+
+    @if(session('success'))
+        <p>{{ session('success') }}</p>
+    @endif
+
+    <ul>
+        @foreach($rooms as $room)
+            <li>Kamar {{ $room->room_number }} ({{ $room->level }}, {{ $room->type }})</li>
+        @endforeach
+    </ul>
+
+    <a href="{{ route('patients.admitForm') }}">Admit Pasien</a>
+</body>
+</html>
+
+lanjutan crud lengkap 
+@extends('layouts.app')
+
+@section('content')
+    <h1>Daftar Kamar</h1>
+    <a href="{{ route('rooms.create') }}">Tambah Kamar</a>
+    <table>
+        <thead>
+            <tr>
+                <th>Nomor Kamar</th>
+                <th>Lantai</th>
+                <th>Tipe</th>
+                <th>Status</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($rooms as $room)
+                <tr>
+                    <td>{{ $room->room_number }}</td>
+                    <td>{{ $room->level }}</td>
+                    <td>{{ $room->type }}</td>
+                    <td>{{ $room->is_available ? 'Tersedia' : 'Tidak Tersedia' }}</td>
+                    <td>
+                        <a href="{{ route('rooms.edit', $room->id) }}">Edit</a>
+                        <form action="{{ route('rooms.destroy', $room->id) }}" method="POST" style="display:inline;">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit">Hapus</button>
+                        </form>
+                    </td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+@endsection
+
+   - resources/views/patients/discharge.blade.php
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admit Pasien</title>
+</head>
+<body>
+    <h1>Admit Pasien</h1>
+
+    <form action="{{ route('patients.admit') }}" method="POST">
+        @csrf
+        <label for="name">Nama:</label>
+        <input type="text" id="name" name="name" required><br><br>
+
+        <label for="admission_date">Tanggal Masuk:</label>
+        <input type="date" id="admission_date" name="admission_date" required><br><br>
+
+        <label for="room_id">Kamar:</label>
+        <select id="room_id" name="room_id" required>
+            @foreach($availableRooms as $room)
+                <option value="{{ $room->id }}">Kamar {{ $room->room_number }} ({{ $room->level }}, {{ $room->type }})</option>
+            @endforeach
+        </select><br><br>
+
+        <button type="submit">Admit</button>
+    </form>
+</body>
+</html>
+
+lanjutan crud lengkap 
+@extends('layouts.app')
+
+@section('content')
+    <h1>Daftar Pasien</h1>
+    <a href="{{ route('patients.create') }}">Tambah Pasien</a>
+    <table>
+        <thead>
+            <tr>
+                <th>Nama</th>
+                <th>Tanggal Masuk</th>
+                <th>Tanggal Keluar</th>
+                <th>Kamar</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($patients as $patient)
+                <tr>
+                    <td>{{ $patient->name }}</td>
+                    <td>{{ $patient->admission_date }}</td>
+                    <td>{{ $patient->discharge_date ?? 'Belum Keluar' }}</td>
+                    <td>{{ $patient->room->room_number }}</td>
+                    <td>
+                        <a href="{{ route('patients.edit', $patient->id) }}">Edit</a>
+                        <form action="{{ route('patients.destroy', $patient->id) }}" method="POST" style="display:inline;">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit">Hapus</button>
+                        </form>
+                    </td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+@endsection
+
+7. Menjalankan Aplikasi
+C:\Users\ASUS\Desktop\laravel>php artisan serve
+
+   INFO  Server running on [http://127.0.0.1:8000].
+
+  Press Ctrl+C to stop the server
+
+  2024-06-23 00:33:20 .......................................................................................... ~ -1s
+  2024-06-23 00:33:21 ........................................................................................... ~ 0s
+  2024-06-23 00:33:21 /favicon.ico .............................................................................. ~ 0s
+
+C:\Users\ASUS\Desktop\laravel>php artisan migrate
+
+   WARN  The database 'laravel' does not exist on the 'mysql' connection.
+
+  Would you like to create it? (yes/no) [yes]
+❯ yes
+
+   INFO  Preparing database.
+
+  Creating migration table ........................................................................................................... 459.89ms DONE
+
+   INFO  Running migrations.
+
+  0001_01_01_000000_create_users_table ............................................................................................... 655.22ms DONE
+  0001_01_01_000001_create_cache_table ............................................................................................... 170.66ms DONE
+  0001_01_01_000002_create_jobs_table ................................................................................................ 407.35ms DONE
+  2024_06_22_131951_create_rooms_table ................................................................................................ 57.06ms DONE
+  2024_06_22_160205_create_patients_table ............................................................................................ 711.12ms DONE
+
+
+Buka aplikasi di browser pada http://localhost:8080 atau http://localhost:8080/phpmyadmin
+	Tabel Menaik	Tindakan	Baris 	Jenis	Penyortiran	Ukuran	Beban
+	cache	 	Jelajahi Jelajahi	Struktur Struktur	Cari Cari	Tambahkan Tambahkan	Kosongkan Kosongkan	Hapus Hapus	0	InnoDB	utf8mb4_unicode_ci	16.0 KB	-
+	cache_locks	 	Jelajahi Jelajahi	Struktur Struktur	Cari Cari	Tambahkan Tambahkan	Kosongkan Kosongkan	Hapus Hapus	0	InnoDB	utf8mb4_unicode_ci	16.0 KB	-
+	failed_jobs	 	Jelajahi Jelajahi	Struktur Struktur	Cari Cari	Tambahkan Tambahkan	Kosongkan Kosongkan	Hapus Hapus	0	InnoDB	utf8mb4_unicode_ci	32.0 KB	-
+	jobs	 	Jelajahi Jelajahi	Struktur Struktur	Cari Cari	Tambahkan Tambahkan	Kosongkan Kosongkan	Hapus Hapus	0	InnoDB	utf8mb4_unicode_ci	32.0 KB	-
+	job_batches	 	Jelajahi Jelajahi	Struktur Struktur	Cari Cari	Tambahkan Tambahkan	Kosongkan Kosongkan	Hapus Hapus	0	InnoDB	utf8mb4_unicode_ci	16.0 KB	-
+	migrations	 	Jelajahi Jelajahi	Struktur Struktur	Cari Cari	Tambahkan Tambahkan	Kosongkan Kosongkan	Hapus Hapus	5	InnoDB	utf8mb4_unicode_ci	16.0 KB	-
+	password_reset_tokens	 	Jelajahi Jelajahi	Struktur Struktur	Cari Cari	Tambahkan Tambahkan	Kosongkan Kosongkan	Hapus Hapus	0	InnoDB	utf8mb4_unicode_ci	16.0 KB	-
+	patients	 	Jelajahi Jelajahi	Struktur Struktur	Cari Cari	Tambahkan Tambahkan	Kosongkan Kosongkan	Hapus Hapus	0	InnoDB	utf8mb4_unicode_ci	32.0 KB	-
+	rooms	 	Jelajahi Jelajahi	Struktur Struktur	Cari Cari	Tambahkan Tambahkan	Kosongkan Kosongkan	Hapus Hapus	0	InnoDB	utf8mb4_unicode_ci	16.0 KB	-
+	sessions	 	Jelajahi Jelajahi	Struktur Struktur	Cari Cari	Tambahkan Tambahkan	Kosongkan Kosongkan	Hapus Hapus	0	InnoDB	utf8mb4_unicode_ci	48.0 KB	-
+	users	 	Jelajahi Jelajahi	Struktur Struktur	Cari Cari	Tambahkan Tambahkan	Kosongkan Kosongkan	Hapus Hapus	0	InnoDB	utf8mb4_unicode_ci	32.0 KB	-
+11 tabel	Jumlah	5	InnoDB	utf8mb4_general_ci	272.0 KB	0 B
+
+
+mekanisme dan struktur relasi tabel yang diperlukan untuk sistem ketersediaan kamar di rumah sakit.
+
+1. Analisis Mekanisme dan Struktur Relasi Tabel
+
+Tabel rooms
+- ID: ID unik untuk setiap kamar.
+- room_number: Nomor unik untuk kamar.
+- level: Level atau lantai kamar berada.
+- type: Jenis kamar (misalnya, ICU, VIP, reguler).
+- is_available: Status ketersediaan kamar (boolean).
+
+Tabel patients
+- ID: ID unik untuk setiap pasien.
+- name: Nama pasien.
+- admission_date: Tanggal pasien masuk.
+- discharge_date: Tanggal pasien keluar (nullable).
+- room_id: Foreign key mengacu ke tabel `rooms`.
+
+2. Ketersediaan Kamar
+- Ketersediaan kamar akan berkurang jika ada pasien masuk (admission), dan status `is_available` pada tabel `rooms` diupdate menjadi `false`.
+- Ketersediaan kamar akan kembali (status `is_available` diupdate menjadi `true`) setelah pasien keluar (discharge).
+
+3. Rancangan Relasi Tabel
+
+Relasi antara tabel rooms dan patients adalah one-to-many:
+- Satu kamar (`room`) bisa ditempati oleh banyak pasien (patients), tapi setiap pasien hanya menempati satu kamar pada satu waktu.
+
